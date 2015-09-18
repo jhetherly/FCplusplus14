@@ -532,6 +532,16 @@ auto make_curriable (F &&f, Ret (T::*)(Args ...args) const)
   return temp;
 }
 
+template <class Ret, class ...Args>
+auto make_curriable (const std::function<Ret(Args...)> &f)
+{
+  // auto ff = f.template target<Ret(*)(Args...)>();
+  // auto fff = *ff;
+  // curried_type<typename std::decay<decltype(*fff)>::type, sizeof...(Args)> temp(fff);
+  curried_type<typename std::decay<decltype(f)>::type, sizeof...(Args)> temp(f);
+  return temp;
+}
+
 
 
 // ////////////////////

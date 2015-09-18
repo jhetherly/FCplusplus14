@@ -262,6 +262,7 @@ int main ()
   // runtime performance
   std::cout << std::endl << "Storing in a std::function" << std::endl;
   std::function<int(int)> re = addtwo;
+  auto rere = make_curriable(re);
   // re(3,4); // compile-time error
   // re(3)(); // compile-time error
 
@@ -270,6 +271,8 @@ int main ()
   std::cout << "Priming loops ..." << std::endl;
   for (auto num1 : random_nums1)
     loop_sum += re(num1);
+  for (auto num1 : random_nums1)
+    loop_sum += rere(num1)();
 
   // re-eagered function
   start = steady_clock::now();
@@ -287,11 +290,20 @@ int main ()
   ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size());
   std::cout << "Average time for " << random_nums1.size() << " calls to (1 arg std::function) re: " << ave_diff << " ns" << std::endl;
 
+  // re-curried function
+  start = steady_clock::now();
+  for (auto num1 : random_nums1)
+    loop_sum += rere(num1)();
+  end = steady_clock::now();
+  ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size());
+  std::cout << "Average time for " << random_nums1.size() << " calls to (1 arg re-curried function) rere: " << ave_diff << " ns" << std::endl;
+
 
 
 
   std::cout << "\n\nDummy sum value: " << loop_sum << std::endl;
 
+  // std::function is subtype polymorphic!!!
   // struct A {};
   // struct B : public A {};
   // struct C {};
