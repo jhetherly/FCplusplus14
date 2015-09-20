@@ -1,4 +1,3 @@
-#include <iostream>
 #include <utility>
 #include <type_traits>
 #include <functional>
@@ -26,6 +25,7 @@ const placeholder _{};
 
 template <class F, int N>
 struct curried_type {
+  using func_type = F;
   F func;
 
   curried_type (F &&f) : func(std::move(f)) {}
@@ -35,9 +35,7 @@ struct curried_type {
   template <class T, class ...Args>
   operator std::function<T(Args...)>() const
   {
-    const F &f = func; // make locally scoped for copying into lambda
-    std::function<T(Args...)> temp([f](auto&& ...args) {return f(std::forward<decltype(args)>(args)...);});
-    // std::function<T(Args...)> temp(make_eager(*this));
+    std::function<T(Args...)> temp{F(func)};
     return temp; 
   }
   
@@ -235,6 +233,7 @@ struct curried_type {
 
 template <class F>
 struct curried_type<F, 1> {
+  using func_type = F;
   F func;
 
   curried_type (F &&f) : func(std::move(f)) {}
@@ -244,9 +243,7 @@ struct curried_type<F, 1> {
   template <class T, class Arg>
   operator std::function<T(Arg)>() const
   {
-    const F &f = func; // make locally scoped for copying into lambda
-    std::function<T(Arg)> temp([f](auto&& arg) {return f(std::forward<decltype(arg)>(arg));});
-    // std::function<T(Arg)> temp(make_eager(*this));
+    std::function<T(Arg)> temp{F(func)};
     return temp; 
   }
 
@@ -442,9 +439,10 @@ struct curried_type<F, 1> {
 
 
 
-// suspension
+// suspension (result of F() should be either copy- or move-constructable)
 template <class F>
 struct curried_type<F, 0> {
+  using func_type = F;
 #if defined(FCPP_TREADSAFE_SUSP)
   mutable std::once_flag once_flag;
 #endif
@@ -452,7 +450,7 @@ struct curried_type<F, 0> {
   F func;
 
   using result_type = typename std::decay<decltype(func())>::type;
-  mutable result_type val;
+  mutable typename std::aligned_storage<sizeof(result_type), alignof(result_type)>::type result;
 
   using thunk_type = result_type const & (*) (const curried_type<F, 0>*);
   mutable thunk_type thunk;
@@ -470,13 +468,13 @@ struct curried_type<F, 0> {
 
   result_type const & getMemo () const
   {
-    return val;
+    return reinterpret_cast<result_type&>(result);
   }
 
 #if defined(FCPP_TREADSAFE_SUSP)
   void setMemo_impl () const
   {
-    val = func();
+    new(&result) result_type(func());
     thunk = &thunkGet;
   }
 #endif
@@ -486,20 +484,33 @@ struct curried_type<F, 0> {
 #if defined(FCPP_TREADSAFE_SUSP)
     std::call_once(once_flag, [this]() {this->setMemo_impl();});
 #else
-    val = func();
+    // should be same as setMemo_impl()
+    new(&result) result_type(func());
     thunk = &thunkGet;
 #endif
     return this->getMemo();
   }
 
 #if defined(FCPP_TREADSAFE_SUSP)
-  // needed for atomic and mutex approaches
+  // needed for mutex approach
   curried_type (curried_type &&c) : func(std::move(c.func)), thunk(&thunkForce) {}
   curried_type (const curried_type &c) : func(c.func), thunk(&thunkForce) {}
+#else
+  curried_type (curried_type &&c) = default;
+  curried_type (const curried_type &c) = default;
 #endif
+  ~curried_type() {if (thunk == &thunkGet) reinterpret_cast<result_type&>(result).~result_type();}
 
   curried_type (F &&f) : func(std::move(f)), thunk(&thunkForce) {}
   curried_type (const F &f) : func(f), thunk(&thunkForce) {}
+
+  // automatic conversion to std::function
+  template <class T>
+  operator std::function<T()>() const
+  {
+    std::function<T()> temp{F(func)};
+    return temp; 
+  }
 
   template <class ...Args>
   auto operator() (Args&& ...) const
@@ -532,13 +543,30 @@ auto make_curriable (F &&f, Ret (T::*)(Args ...args) const)
   return temp;
 }
 
+// this is incredibly inefficient, but may be necessary
 template <class Ret, class ...Args>
 auto make_curriable (const std::function<Ret(Args...)> &f)
 {
-  // auto ff = f.template target<Ret(*)(Args...)>();
-  // auto fff = *ff;
-  // curried_type<typename std::decay<decltype(*fff)>::type, sizeof...(Args)> temp(fff);
   curried_type<typename std::decay<decltype(f)>::type, sizeof...(Args)> temp(f);
+  return temp;
+}
+
+// try to use either this or the next one instead
+//  this one needs the explicit type
+template <class F, class Ret, class ...Args>
+auto make_curriable (const std::function<Ret(Args...)> &f)
+{
+  auto ptr_func = *f.template target<F>();
+  curried_type<typename std::decay<F>::type, sizeof...(Args)> temp(ptr_func);
+  return temp;
+}
+
+//  this one needs a "template" curried_type (beware! if original function was a lambda this function effectually returns c)
+template <class F, int N, class Ret, class ...Args>
+auto make_curriable (const curried_type<F,N> &c, const std::function<Ret(Args...)> &f)
+{
+  auto ptr_func = *f.template target<F>();
+  curried_type<typename std::decay<F>::type, sizeof...(Args)> temp(ptr_func);
   return temp;
 }
 

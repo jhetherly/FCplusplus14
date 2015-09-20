@@ -1,3 +1,4 @@
+#include <iostream>
 #include <random>
 #include <chrono>
 #include <functional>
@@ -210,7 +211,7 @@ int main ()
 
   std::cout << std::endl << "Generic lambda (3 arguments, 2 placeholders)" << std::endl;
   auto add2p = addtrio(_,_,4);
-  auto _add2p = [](auto x1, auto x2) {return x1 + x2 + x2 + 4 + 4 + 4;};
+  auto _add2p = [](auto&& x1, auto&& x2) {return x1 + x2 + x2 + 4 + 4 + 4;};
   std::cout << "Value check: " << _add2p(2,3) << " == " << add2p(2,3)() << " == " << add2p(2)(3)() << std::endl;
 
   // lambda call
@@ -263,6 +264,8 @@ int main ()
   std::cout << std::endl << "Storing in a std::function" << std::endl;
   std::function<int(int)> re = addtwo;
   auto rere = make_curriable(re);
+  auto rerere = make_curriable<decltype(addtwo.func)>(re); // i.e. rerere == addtwo
+  // auto rerere = make_curriable(addtwo, re); // i.e. rerere == addtwo
   // re(3,4); // compile-time error
   // re(3)(); // compile-time error
 
@@ -273,6 +276,8 @@ int main ()
     loop_sum += re(num1);
   for (auto num1 : random_nums1)
     loop_sum += rere(num1)();
+  for (auto num1 : random_nums1)
+    loop_sum += rerere(num1)();
 
   // re-eagered function
   start = steady_clock::now();
@@ -298,12 +303,52 @@ int main ()
   ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size());
   std::cout << "Average time for " << random_nums1.size() << " calls to (1 arg re-curried function) rere: " << ave_diff << " ns" << std::endl;
 
+  // re-curried function
+  start = steady_clock::now();
+  for (auto num1 : random_nums1)
+    loop_sum += rerere(num1)();
+  end = steady_clock::now();
+  ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size());
+  std::cout << "Average time for " << random_nums1.size() << " calls to (1 arg re-curried \"type specified\" function) rerere: " << ave_diff << " ns" << std::endl;
+
+
+
+
+  // thunk performance
+  std::cout << std::endl << "Forcing and retrieving a thunk" << std::endl;
+  std::list<std::function<int()>> random_thunks;
+  for (auto num1 : random_nums1)
+    // random_thunks.push_back(static_cast<std::function<int()>>(addtwo(num1))); // requires ugly static_cast
+    random_thunks.emplace_back(addtwo(num1));
+
+  start = steady_clock::now();
+  for (auto num1 : random_nums1)
+    loop_sum += num1;
+  end = steady_clock::now();
+  ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size());
+  std::cout << "Average time for " << random_nums1.size() << " addition of random numbers: " << ave_diff << " ns" << std::endl;
+
+  start = steady_clock::now();
+  for (const auto &thunk : random_thunks)
+    loop_sum += thunk();
+  end = steady_clock::now();
+  ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size());
+  std::cout << "Average time for " << random_nums1.size() << " calls to force a thunk: " << ave_diff << " ns" << std::endl;
+
+  start = steady_clock::now();
+  for (const auto &thunk : random_thunks)
+    loop_sum += thunk();
+  end = steady_clock::now();
+  ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size());
+  std::cout << "Average time for " << random_nums1.size() << " calls to retrieve a thunk: " << ave_diff << " ns" << std::endl;
+
 
 
 
   std::cout << "\n\nDummy sum value: " << loop_sum << std::endl;
 
-  // std::function is subtype polymorphic!!!
+  // std::function is subtype polymorphic (but eager)!!!
+  //  I think for the sake of maximal STL compatibility std::function should take the role of indirect functoids
   // struct A {};
   // struct B : public A {};
   // struct C {};
@@ -331,6 +376,17 @@ int main ()
   // int &arg_ref2 = arg;
   // ++arg_ref2;
   // std::cout << add14(arg_ref2)() << std::endl;
+
+  // // std::cout << "is thunk forced?" << std::endl;
+  // auto addtriothunk = addtrio(2)(3)(4);
+  // std::cout << addtriothunk() << std::endl;
+  // std::cout << addtriothunk() << std::endl;
+  // 
+  // std::function<int()> holder = addtrio(2)(3)(4);
+  // std::cout << holder() << ", " << holder() << std::endl;
+  // holder = addtwo(3);
+  // std::cout << holder() << ", " << holder() << std::endl;
+
 
   // // std::cout << "is thunk forced?" << std::endl;
   // auto addtriothunk = addtrio(2)(3)(4);
