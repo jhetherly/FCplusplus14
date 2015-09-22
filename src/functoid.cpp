@@ -4,7 +4,7 @@
 #include <functional>
 #include <list>
 
-#include "FC++14/functiod.h"
+#include "FC++14/functoid.h"
 
 struct FuncObject {
   auto operator() (double a, double b) const

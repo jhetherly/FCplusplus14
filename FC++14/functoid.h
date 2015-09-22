@@ -1,3 +1,6 @@
+#ifndef FCPP_FUNCTOID_H
+#define FCPP_FUNCTOID_H
+
 #include <utility>
 #include <type_traits>
 #include <functional>
@@ -28,6 +31,7 @@ struct curried_type {
   using func_type = F;
   F func;
 
+  curried_type() = delete;
   curried_type (F &&f) : func(std::move(f)) {}
   curried_type (const F &f) : func(f) {}
 
@@ -236,6 +240,7 @@ struct curried_type<F, 1> {
   using func_type = F;
   F func;
 
+  curried_type() = delete;
   curried_type (F &&f) : func(std::move(f)) {}
   curried_type (const F &f) : func(f) {}
 
@@ -439,7 +444,7 @@ struct curried_type<F, 1> {
 
 
 
-// suspension (result of F() should be either copy- or move-constructable)
+// suspension (result of func() should be either copy- or move-constructable)
 template <class F>
 struct curried_type<F, 0> {
   using func_type = F;
@@ -491,6 +496,7 @@ struct curried_type<F, 0> {
     return this->getMemo();
   }
 
+  curried_type() = delete;
 #if defined(FCPP_TREADSAFE_SUSP)
   // needed for mutex approach
   curried_type (curried_type &&c) : func(std::move(c.func)), thunk(&thunkForce) {}
@@ -499,18 +505,14 @@ struct curried_type<F, 0> {
   curried_type (curried_type &&c) = default;
   curried_type (const curried_type &c) = default;
 #endif
-  ~curried_type() {if (thunk == &thunkGet) reinterpret_cast<result_type&>(result).~result_type();}
+  ~curried_type() 
+  {
+    if (thunk == &thunkGet) 
+      reinterpret_cast<result_type&>(result).~result_type();
+  }
 
   curried_type (F &&f) : func(std::move(f)), thunk(&thunkForce) {}
   curried_type (const F &f) : func(f), thunk(&thunkForce) {}
-
-  // automatic conversion to std::function
-  template <class T>
-  operator std::function<T()>() const
-  {
-    std::function<T()> temp{F(func)};
-    return temp; 
-  }
 
   template <class ...Args>
   auto operator() (Args&& ...) const
@@ -543,7 +545,7 @@ auto make_curriable (F &&f, Ret (T::*)(Args ...args) const)
   return temp;
 }
 
-// this is incredibly inefficient, but may be necessary
+// this is incredibly inefficient, but may be necessary in some cases
 template <class Ret, class ...Args>
 auto make_curriable (const std::function<Ret(Args...)> &f)
 {
@@ -572,6 +574,20 @@ auto make_curriable (const curried_type<F,N> &c, const std::function<Ret(Args...
 
 
 
+// ////////////////////////////////////////////
+// create a suspension to manage a single value
+// ////////////////////////////////////////////
+template <class T>
+auto make_suspension_for_value (T&& val)
+{
+  auto temp = make_curriable<0>([val = std::forward<T>(val)]() {return val;});
+  new(&temp.result) typename std::decay<T>::type(std::forward<T>(val));
+  temp.thunk = &decltype(temp)::thunkGet;
+  return temp;
+}
+
+
+
 // ////////////////////
 // composition operator
 // ////////////////////
@@ -590,16 +606,20 @@ auto operator< (const curried_type<F1, 1> &c1, const curried_type<F2, N2> &c2)
 template <int N, class F>
 auto make_eager (curried_type<F,N> &&c)
 {
-  return [c = std::move(c)](auto&& ...args) {static_assert(sizeof...(args) == N, "supplied the incorrect number of arguments to eager function"); 
+  return [c = std::move(c)](auto&& ...args) {
+    static_assert(sizeof...(args) == N, "supplied the incorrect number of arguments to eager function"); 
     return c(std::forward<decltype(args)>(args)...)();};
 }
 
 template <int N, class F>
 auto make_eager (const curried_type<F,N> &c)
 {
-  return [&c](auto&& ...args) {static_assert(sizeof...(args) == N, "supplied the incorrect number of arguments to eager function");
+  return [&c](auto&& ...args) {
+    static_assert(sizeof...(args) == N, "supplied the incorrect number of arguments to eager function");
     return c(std::forward<decltype(args)>(args)...)();};
 }
 
 
 }
+
+#endif
