@@ -60,6 +60,11 @@ int main ()
   auto addtoo = make_curriable(addtogether);
   std::cout << "Value check: " << addtogether(2,3) << " == " << addtoo(2,3)() << std::endl;
 
+  std::cout << "Priming loops ..." << std::endl;
+  for (auto num1 : random_nums1)
+    for (auto num2 : random_nums2)
+      loop_sum += num1 + num2;
+
   // no function call
   start = steady_clock::now();
   for (auto num1 : random_nums1)
@@ -94,6 +99,11 @@ int main ()
   std::cout << std::endl << "Function object" << std::endl;
   auto addobject = make_curriable(func_object, &FuncObject::operator());
   std::cout << "Value check: " << func_object(2,3) << " == " << addobject(2)(3)() << std::endl;
+
+  std::cout << "Priming loops ..." << std::endl;
+  for (auto num1 : random_nums1)
+    for (auto num2 : random_nums2)
+      loop_sum += num1 + num2;
 
   // no function call
   start = steady_clock::now();
@@ -131,6 +141,11 @@ int main ()
   auto _adder = [](auto x1, auto x2) {return x1 + x2 + x2;};
   std::cout << "Value check: " << _adder(2,3) << " == " << adder(2)(3)() << std::endl;
 
+  std::cout << "Priming loops ..." << std::endl;
+  for (auto num1 : random_nums1)
+    for (auto num2 : random_nums2)
+      loop_sum += num1 + num2 + num2;
+
   // no function call
   start = steady_clock::now();
   for (auto num1 : random_nums1)
@@ -163,6 +178,11 @@ int main ()
   auto addtwo = adder(2);
   std::cout << "Value check: " << _adder(2, 3) << " == " << addtwo(3)() << std::endl;
   std::cout << "Are the stored function type and temporary type the same? : " << std::boolalpha << std::is_same<decltype(addtwo), decltype(adder(2))>::value << std::endl;
+
+  std::cout << "Priming loops ..." << std::endl;
+  for (auto num1 : random_nums1)
+    loop_sum += addtwo(num1)();
+
   start = steady_clock::now();
   for (auto num1 : random_nums1)
     loop_sum += addtwo(num1)();
@@ -177,6 +197,12 @@ int main ()
   auto addtrio = make_curriable<3>([](auto x1, auto x2, auto x3) {return x1 + x2 + x2 + x3 + x3 + x3;});
   auto _addtrio = [](auto x1, auto x2, auto x3) {return x1 + x2 + x2 + x3 + x3 + x3;};
   std::cout << "Value check: " << _addtrio(2,3,4) << " == " << addtrio(2,3,4)() << " == " << addtrio(2,3)(4)() << " == " << addtrio(2)(3)(4)() << std::endl;
+
+  std::cout << "Priming loops ..." << std::endl;
+  for (auto num1 : random_nums1)
+    for (auto num2 : random_nums2)
+      for (auto num3 : random_nums3)
+        loop_sum += num1 + num2 + num2 + num3 + num3 + num3;
 
   // no function call
   start = steady_clock::now();
@@ -214,6 +240,11 @@ int main ()
   auto _add2p = [](auto&& x1, auto&& x2) {return x1 + x2 + x2 + 4 + 4 + 4;};
   std::cout << "Value check: " << _add2p(2,3) << " == " << add2p(2,3)() << " == " << add2p(2)(3)() << std::endl;
 
+  std::cout << "Priming loops ..." << std::endl;
+  for (auto num1 : random_nums1)
+    for (auto num2 : random_nums2)
+      loop_sum += num1 + num2;
+
   // lambda call
   start = steady_clock::now();
   for (auto num1 : random_nums1)
@@ -239,6 +270,11 @@ int main ()
   auto comp = addtwo < addtwo < addtwo < addtrio(2);
   auto manual_comp = [](auto a, auto b) {return 2 + 2*(2 + 2*(2 + 2*(2 + 2*a + 3*b)));};
   std::cout << "Value check: " << manual_comp(5, 3) << " == " << comp(5, 3)() << std::endl;
+
+  std::cout << "Priming loops ..." << std::endl;
+  for (auto num1 : random_nums1)
+    for (auto num2 : random_nums2)
+      loop_sum += comp(num1, num2)();
 
   // lambda call
   start = steady_clock::now();
@@ -274,10 +310,6 @@ int main ()
   std::cout << "Priming loops ..." << std::endl;
   for (auto num1 : random_nums1)
     loop_sum += re(num1);
-  for (auto num1 : random_nums1)
-    loop_sum += rere(num1)();
-  for (auto num1 : random_nums1)
-    loop_sum += rerere(num1)();
 
   // re-eagered function
   start = steady_clock::now();
@@ -321,12 +353,20 @@ int main ()
     // random_thunks.push_back(static_cast<std::function<int()>>(addtwo(num1))); // requires ugly static_cast
     random_thunks.emplace_back(addtwo(num1));
 
+  std::cout << "Priming loops ..." << std::endl;
+  for (auto num1 : random_nums1)
+    loop_sum += num1;
+
   start = steady_clock::now();
   for (auto num1 : random_nums1)
     loop_sum += num1;
   end = steady_clock::now();
   ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size());
-  std::cout << "Average time for " << random_nums1.size() << " addition of random numbers: " << ave_diff << " ns" << std::endl;
+  std::cout << "Average time for " << random_nums1.size() << " additions of random numbers: " << ave_diff << " ns" << std::endl;
+
+  std::cout << "Priming thunk loops ..." << std::endl;
+  for (const auto &thunk : random_thunks) // ignore this warning
+    loop_sum += 1;
 
   start = steady_clock::now();
   for (const auto &thunk : random_thunks)
