@@ -436,4 +436,9 @@ int main ()
   // const auto& l = [](auto x) {return 2.0*x;};
   // auto c = make_curriable<1>(l);
   // std::cout << l(5) << ", " << c(5)() << std::endl;
+
+  // auto factorial = fix([](auto&& self, long double n) -> long double
+  //     { return n < 2.0 ? 1.0 : n * self(self, n - 1.0); });
+
+  // std::cout << factorial(1000) << std::endl;
 }

@@ -2,8 +2,7 @@
 #include <random>
 #include <chrono>
 
-#include "FC++14/functoid.h"
-#include "FC++14/list.h"
+#include "FC++14/prelude.h"
 
 
 using namespace std::chrono;
@@ -11,10 +10,15 @@ using namespace fcpp;
 
 int main ()
 {
-  // auto factorial = fix([](auto&& self, long double n) -> long double
-  //     { return n < 2.0 ? 1.0 : n * self(self, n - 1.0); });
-
-  // std::cout << factorial(1000) << std::endl;
+  // // random number generation setup
+  // std::random_device rd;
+  // std::mt19937 gen(rd());
+  // std::uniform_int_distribution<> dis(-10, 10);
+  // auto random_num = [&gen, &dis]() {return dis(gen);};
+  // setup clock for timing
+  auto start = steady_clock::now();
+  auto end = steady_clock::now();
+  auto ave_diff = duration <double, std::nano> (end - start).count();
 
   List<int> l1;
   std::cout << std::boolalpha << nil(l1)() << std::endl;
@@ -39,6 +43,25 @@ int main ()
   auto l5 = enumFromTo('a','b','z');
   for (auto e : l5())
     std::cout << e << "  ";
+  std::cout << std::endl; 
+
+
+  double sum = 0.0;
+  long long large_loop = 100000;
+  start = steady_clock::now();
+  for (auto e : enumFromTo(1,2,large_loop)())
+    sum += e;
+  end = steady_clock::now();
+  ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(large_loop);
+  std::cout << "Average per-element time for summing enumerated " << large_loop << " numbers: " << ave_diff << " ns" << std::endl;
+
+  start = steady_clock::now();
+  for (long long i = 1; i <= large_loop; ++i)
+    sum += i;
+  end = steady_clock::now();
+  ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(large_loop);
+  std::cout << "Average per-element time for summing " << large_loop << " numbers: " << ave_diff << " ns" << std::endl;
+
   std::cout << std::endl; 
 
   return 0;
