@@ -1,6 +1,7 @@
 #ifndef FCPP_LIST_H
 #define FCPP_LIST_H
 
+#include <iterator>
 #include <memory>
 #include <utility>
 #include <type_traits>
@@ -31,7 +32,7 @@ namespace fcpp
 //  really just functions that generate to requisite L on demand. Users 
 //  typically hold on to the L on the lower left.
 
-template<class T>
+template<class T, class A = std::allocator<T>>
 struct List;
 
 
@@ -84,6 +85,16 @@ struct ListSuspensionManager :
     _thunk(f),
     _tail_gen{tail_gen} {}
 
+  bool operator== (const ListSuspensionManager<T> &other) const
+  {
+    bool are_equal = true;
+    if (_thunk && other._thunk) are_equal &= (_thunk() == other._thunk());
+    else if ((!_thunk && other._thunk) || (_thunk && !other._thunk)) are_equal &= false;
+    are_equal &= (_tail == other._tail);
+    if ((!_tail_gen && other._tail_gen) || (_tail_gen && !other._tail_gen)) are_equal &= false;
+    return are_equal;
+  }
+  bool operator!= (const ListSuspensionManager<T> &other) const {return !(*this == other);}
   std::shared_ptr<const ListSuspensionManager<T>> get_handle() const {return this->shared_from_this();}
   T operator() () {return _thunk();}
   bool is_last_element () const {return !(_tail_gen || _tail);}
@@ -100,16 +111,21 @@ struct ListSuspensionManager :
 
 
 
-template<class T>
+template<class T, class A>
 struct List {
   using list_generator_type = std::function<List<T>(const List<T>&)>;
   using thunk_type = std::function<T()>;
+  // STL compliance
+  struct const_iterator;
 
   // copy
   List (const List<T> &l) = default;
-
+  // copy assign
+  List& operator=(const List<T> &l) = default;
   // move
   List (List<T>&& l) = default;
+  // move assign
+  List& operator=(List<T>&& l) = default;
 
   // empty list
   List() = default;
@@ -141,6 +157,9 @@ struct List {
   List (const T &val, list_generator_type f) : 
     _head(std::make_shared<const _impl::ListSuspensionManager<T>>(val, f)) {}
 
+  bool operator== (const List &l) const {if (!l._head || !_head) return l._head == _head; return *l._head == *_head;}
+  bool operator!= (const List &l) const {return !(l == *this);}
+
   const auto& operator() () const & {return *this;}
   auto operator() () && {return std::move(*this);}
   T head () const
@@ -160,8 +179,37 @@ struct List {
   bool is_empty () const {return static_cast<bool>(_head);}
   list_generator_type get_generator() const {return _head->_tail_gen;}
 
+  const_iterator begin() const {return const_iterator{*this};}
+  const_iterator cbegin() const {return const_iterator{*this};}
+  const_iterator end() const {return const_iterator{List<T>()};}
+  const_iterator cend() const {return const_iterator{List<T>()};}
+
   // "private:" stuff
   std::shared_ptr<const _impl::ListSuspensionManager<T>> _head;
+
+  struct const_iterator {
+    typedef typename A::difference_type difference_type;
+    typedef typename A::value_type value_type;
+    typedef typename A::reference const_reference;
+    typedef typename A::pointer const_pointer;
+    typedef std::input_iterator_tag iterator_category;
+
+    const_iterator () = default;
+    const_iterator (const const_iterator&) = default;
+    ~const_iterator() {}
+
+    const_iterator& operator=(const const_iterator&) = default;
+    bool operator==(const const_iterator &rhs) const {return _element == rhs._element;}
+    bool operator!=(const const_iterator &rhs) const {return _element != rhs._element;}
+
+    const_iterator& operator++() {_element = _element.tail(); return *this;}
+    const_iterator operator++(int) {const_iterator it{_element}; _element = _element.tail(); return it;}
+
+    T operator*() const {return _element.head();}
+    T operator->() const {return _element.head();}
+
+    List<T> _element;
+  };
 };
 
 
@@ -169,26 +217,46 @@ struct List {
 // ///////////////////
 // container functions
 // ///////////////////
-auto nil = make_curriable<1>([](auto&& c) 
-    {return !static_cast<bool>(c().is_empty());});
 
+// works with any functor container with method "is_empty"
+auto nil = make_curriable<1>([](auto&& c) 
+    {return !c().is_empty();});
+
+// works with any functor container c of type c_t with constructor of the form c_t(val, c)
 auto cons = make_curriable<2>([](auto&& val, auto&& c) 
     {typename std::decay<decltype(c())>::type temp(std::forward<decltype(val)>(val), std::forward<decltype(c)>(c));
     return temp;});
 
+// works with any functor container with method "head"
 auto head = make_curriable<1>([](auto&& c) 
     {if (!nil(std::forward<decltype(c)>(c))()) return c().head();
     throw("empty container");}); // TODO: throw for now
 
+// works with any functor container with method "tail"
 auto tail = make_curriable<1>([](auto&& c) 
     {if (!nil(std::forward<decltype(c)>(c))()) return c().tail();
     throw("empty container");}); // TODO: throw for now
 
+// //////////////////
+// List<T> generators
+// //////////////////
+
+// uses List<T>'s generator constructors to make a list from the first two elements in an arithmetic series
 auto enumFrom = make_curriable<2>([](auto&& x1, auto&& x2)
     {using list_t = List<typename std::decay<decltype(x1)>::type>;
     // lambda in lambda technique
     auto func = [diff = x2 - x1](const list_t& l) 
     {return list_t(l.head()+diff, l.get_generator());};
+    return list_t(std::forward<decltype(x1)>(x1), func);});
+
+// uses List<T>'s generator constructors to make a list from the first two elements in an arithmetic series up to the last element
+auto enumFromTo = make_curriable<3>([](auto&& x1, auto&& x2, auto&& xn)
+    {using list_t = List<typename std::decay<decltype(x1)>::type>;
+    // lambda in lambda technique
+    auto func = [diff = x2 - x1, xn](const list_t& l) 
+    {auto next_val = l.head()+diff;
+    if (next_val <= xn) return list_t(l.head()+diff, l.get_generator());
+    return list_t();};
     return list_t(std::forward<decltype(x1)>(x1), func);});
 
 }

@@ -30,6 +30,16 @@ int main ()
   std::cout << (head < tail < tail < tail < tail(l3))() << std::endl;
   auto element10 = head < tail < tail < tail < tail < tail < tail < tail < tail < tail;
   std::cout << element10(l3)() << std::endl;
+  auto l4 = enumFromTo(1,2,10);
+  std::cout << element10(l4)() << std::endl;
+  // tail < element10(l4); // compile time error
+  for (auto e : l4())
+    std::cout << e << "  ";
+  std::cout << std::endl; 
+  auto l5 = enumFromTo('a','b','z');
+  for (auto e : l5())
+    std::cout << e << "  ";
+  std::cout << std::endl; 
 
   return 0;
 }
