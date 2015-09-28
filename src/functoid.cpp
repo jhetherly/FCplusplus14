@@ -266,8 +266,8 @@ int main ()
 
 
   // composition
-  std::cout << std::endl << "Composition (with < operator)" << std::endl;
-  auto comp = addtwo < addtwo < addtwo < addtrio(2);
+  std::cout << std::endl << "Composition (with * operator)" << std::endl;
+  auto comp = addtwo * addtwo * addtwo * addtrio(2);
   auto manual_comp = [](auto a, auto b) {return 2 + 2*(2 + 2*(2 + 2*(2 + 2*a + 3*b)));};
   std::cout << "Value check: " << manual_comp(5, 3) << " == " << comp(5, 3)() << std::endl;
 
@@ -386,6 +386,8 @@ int main ()
 
 
   std::cout << "\n\nDummy sum value: " << loop_sum << std::endl;
+  std::cout << "\n\ninfix test: " << (2 ^adder^ 3)() << std::endl;
+  std::cout << "call test: " << (adder^ 2 ^ 3)() << std::endl;
 
   // std::function is subtype polymorphic (but eager)!!!
   //  I think for the sake of maximal STL compatibility std::function should take the role of indirect functoids

@@ -814,17 +814,17 @@ struct curried_type<F, 0> {
   mutable thunk_type thunk;
 
   // thunk
-  static result_type const & thunkForce (const curried_type<F, 0> *susp)
+  static const result_type& thunkForce (const curried_type<F, 0> *susp)
   {
     return susp->setMemo();
   }
   // thunk
-  static result_type const & thunkGet (const curried_type<F, 0> *susp)
+  static const result_type& thunkGet (const curried_type<F, 0> *susp)
   {
     return susp->getMemo();
   }
 
-  result_type const & getMemo () const
+  const result_type& getMemo () const
   {
     return reinterpret_cast<result_type&>(result);
   }
@@ -837,7 +837,7 @@ struct curried_type<F, 0> {
   }
 #endif
 
-  result_type const & setMemo () const
+  const result_type& setMemo () const
   {
 #if defined(FCPP_TREADSAFE_SUSP)
     std::call_once(once_flag, [this]() {this->setMemo_impl();});
@@ -868,12 +868,12 @@ struct curried_type<F, 0> {
   curried_type (const F &f) : func(f), thunk(&thunkForce) {}
 
   template <class ...Args>
-  auto operator() (Args&& ...) const &
+  const result_type& operator() (Args&& ...) const &
   {
     return thunk(this);
   }
   template <class ...Args>
-  auto operator() (Args&& ...) &&
+  result_type operator() (Args&& ...) &&
   {
     // no need to memoize value if temporary
     return func();
@@ -951,27 +951,63 @@ auto make_suspension_for_value (T&& val)
 // composition operator
 // ////////////////////
 template <class F1, class F2, int N2>
-auto operator< (const curried_type<F1, 1> &c1, const curried_type<F2, N2> &c2)
+auto operator* (const curried_type<F1, 1> &c1, const curried_type<F2, N2> &c2)
 {
   auto temp = make_curriable<N2>([c1, c2](auto&& ...args) {return c1(c2(std::forward<decltype(args)>(args)...)())();});
   return temp;
 }
 template <class F1, class F2, int N2>
-auto operator< (curried_type<F1, 1>&& c1, const curried_type<F2, N2> &c2)
+auto operator* (curried_type<F1, 1>&& c1, const curried_type<F2, N2> &c2)
 {
   auto temp = make_curriable<N2>([c1 = std::move(c1), c2](auto&& ...args) {return c1(c2(std::forward<decltype(args)>(args)...)())();});
   return temp;
 }
 template <class F1, class F2, int N2>
-auto operator< (const curried_type<F1, 1> &c1, curried_type<F2, N2>&& c2)
+auto operator* (const curried_type<F1, 1> &c1, curried_type<F2, N2>&& c2)
 {
   auto temp = make_curriable<N2>([c1, c2 = std::move(c2)](auto&& ...args) {return c1(c2(std::forward<decltype(args)>(args)...)())();});
   return temp;
 }
 template <class F1, class F2, int N2>
-auto operator< (curried_type<F1, 1>&& c1, curried_type<F2, N2>&& c2)
+auto operator* (curried_type<F1, 1>&& c1, curried_type<F2, N2>&& c2)
 {
   auto temp = make_curriable<N2>([c1 = std::move(c1), c2 = std::move(c2)](auto&& ...args) {return c1(c2(std::forward<decltype(args)>(args)...)())();});
+  return temp;
+}
+
+
+
+// //////////////
+// infix operator
+// //////////////
+template <class T, class F, int N>
+auto operator^ (T&& val, curried_type<F, N>&& c)
+{
+  auto temp = c(std::forward<decltype(val)>(val));
+  return temp;
+}
+template <class T, class F, int N>
+auto operator^ (T&& val, const curried_type<F, N> &c)
+{
+  auto temp = c(std::forward<decltype(val)>(val));
+  return temp;
+}
+
+
+
+// ////////////////////////////////
+// infix and function call operator
+// ////////////////////////////////
+template <class T, class F, int N>
+auto operator^ (curried_type<F, N>&& c, T&& val)
+{
+  auto temp = c(std::forward<decltype(val)>(val));
+  return temp;
+}
+template <class T, class F, int N>
+auto operator^ (const curried_type<F, N> &c, T&& val)
+{
+  auto temp = c(std::forward<decltype(val)>(val));
   return temp;
 }
 

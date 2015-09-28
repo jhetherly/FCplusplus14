@@ -24,19 +24,19 @@ int main ()
   std::cout << std::boolalpha << nil(l1)() << std::endl;
   List<int> test(9);
   std::cout << test.head() << std::endl;
-  std::cout << std::boolalpha << nil(test)() << "\t\t" << (nil < tail(test))() << std::endl;
+  std::cout << std::boolalpha << nil(test)() << "\t\t" << (nil * tail(test))() << std::endl;
   List<int> test2(8, test);
-  auto l2 = cons(0) < cons(1) < cons(2, l1);
+  auto l2 = cons(0) * cons(1) * cons(2, l1);
   std::cout << head(l2)() << std::endl;
   std::cout << head(tail(l2))() << std::endl;
   std::cout << head(tail(tail(l2)))() << std::endl;
   auto l3 = enumFrom(1,2);
-  std::cout << (head < tail < tail < tail < tail(l3))() << std::endl;
-  auto element10 = head < tail < tail < tail < tail < tail < tail < tail < tail < tail;
+  std::cout << (head * tail * tail * tail * tail(l3))() << std::endl;
+  auto element10 = head * tail * tail * tail * tail * tail * tail * tail * tail * tail;
   std::cout << element10(l3)() << std::endl;
   auto l4 = enumFromTo(1,2,10);
   std::cout << element10(l4)() << std::endl;
-  // tail < element10(l4); // compile time error
+  // tail * element10(l4); // compile time error
   for (auto e : l4())
     std::cout << e << "  ";
   std::cout << std::endl; 

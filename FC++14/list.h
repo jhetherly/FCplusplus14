@@ -96,7 +96,8 @@ struct ListSuspensionManager :
   }
   bool operator!= (const ListSuspensionManager<T> &other) const {return !(*this == other);}
   std::shared_ptr<const ListSuspensionManager<T>> get_handle() const {return this->shared_from_this();}
-  T operator() () {return _thunk();}
+  const T& operator() () const & {return _thunk();}
+  T operator() () && {return _thunk();}
   bool is_last_element () const {return !(_tail_gen || _tail);}
 
   // "private:" stuff
@@ -162,7 +163,14 @@ struct List {
 
   const auto& operator() () const & {return *this;}
   auto operator() () && {return std::move(*this);}
-  T head () const
+  // const T& head () const &
+  // TODO: fix this!!!
+  T head () const &
+  {
+    if (_head) return _head->_thunk();
+    throw("tried to evaluate an empty list");  // TODO: throw for now (possibly use Maybe monad in future)
+  }
+  T head () &&
   {
     if (_head) return _head->_thunk();
     throw("tried to evaluate an empty list");  // TODO: throw for now (possibly use Maybe monad in future)
@@ -205,8 +213,12 @@ struct List {
     const_iterator& operator++() {_element = _element.tail(); return *this;}
     const_iterator operator++(int) {const_iterator it{_element}; _element = _element.tail(); return it;}
 
-    T operator*() const {return _element.head();}
-    T operator->() const {return _element.head();}
+    // const T& operator*() const & {return _element.head();}
+    // TODO: fix this!!!
+    T operator*() const & {return _element.head();}
+    T operator*() && {return _element.head();}
+    const T& operator->() const & {return _element.head();}
+    T operator->() && {return _element.head();}
 
     List<T> _element;
   };
