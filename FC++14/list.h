@@ -36,6 +36,10 @@ template<class T, class A = std::allocator<T>>
 struct List;
 
 
+// struct NIL_t {NIL_t () = default; template<class T, class A> operator List<T,A>() {return List<T,A>();}} NIL;
+
+
+
 namespace _impl
 {
 
@@ -130,7 +134,7 @@ struct List {
 
   // empty list
   List() = default;
-  // List(NIL) {}
+  List(NIL_t) : List() {}
 
   // single value lists
   List (T&& val) : 

@@ -1,6 +1,7 @@
 #ifndef FCPP_FUNCTOID_H
 #define FCPP_FUNCTOID_H
 
+#include <iostream>
 #include <utility>
 #include <type_traits>
 #include <functional>
@@ -20,7 +21,7 @@ template <int N, class F> auto make_eager (const curried_type<F,N> &c);
 
 
 
-// recursive lambda helper
+// recursive lambda helper (statck overflow)
 template<typename Functor>
 struct fix_type {
   Functor functor;
@@ -97,6 +98,30 @@ struct curried_type {
         [a1 = std::forward<Arg1>(a1), f = std::move(f)](auto&& ...an) 
         {return f(a1, std::forward<decltype(an)>(an)...);}
         )(std::forward<Args>(args)...);
+    return temp;
+  }
+
+  // chance to capture suspension (must call with exact number of args)
+  template <class Arg1, 
+           typename std::enable_if<!std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0>
+  auto operator() (Arg1&& a1) const &
+  {
+    const F &f = func; // make local for copying into lambda
+    auto temp = make_curriable<N - 1>(
+        [a1 = std::forward<Arg1>(a1), f](auto&& ...an) 
+        {return f(a1, std::forward<decltype(an)>(an)...);}
+        );
+    return temp;
+  }
+  template <class Arg1,
+           typename std::enable_if<!std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0>
+  auto operator() (Arg1&& a1) &&
+  {
+    const F &f = func; // make local for copying into lambda
+    auto temp = make_curriable<N - 1>(
+        [a1 = std::forward<Arg1>(a1), f = std::move(f)](auto&& ...an) 
+        {return f(a1, std::forward<decltype(an)>(an)...);}
+        );
     return temp;
   }
 
@@ -417,382 +442,138 @@ struct curried_type {
 
 
 
-template <class F>
-struct curried_type<F, 1> {
-  using func_type = F;
-  F func;
-
-  curried_type() = delete;
-  curried_type (F &&f) : func(std::move(f)) {}
-  curried_type (const F &f) : func(f) {}
-
-  // automatic conversion to std::function
-  template <class T, class Arg>
-  operator std::function<T(Arg)>() const &
-  {
-    std::function<T(Arg)> temp{F(func)};
-    return temp; 
-  }
-  template <class T, class Arg>
-  operator std::function<T(Arg)>() &&
-  {
-    std::function<T(Arg)> temp{std::move(func)};
-    return temp; 
-  }
-
-  
-  // normal currying
-  template <class Arg1, class ...Args, 
-           typename std::enable_if<!std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0>
-  auto operator() (Arg1&& a1, Args&& ...args) const &
-  {
-    const F &f = func; // make local for copying into lambda
-    auto temp = make_curriable<0>(
-        [a1 = std::forward<Arg1>(a1), f](auto&& ...an) 
-        {return f(a1, std::forward<decltype(an)>(an)...);}
-        );
-    return temp;
-  }
-  template <class Arg1, class ...Args, 
-           typename std::enable_if<!std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0>
-  auto operator() (Arg1&& a1, Args&& ...args) &&
-  {
-    const F &f = func; // make local for copying into lambda
-    auto temp = make_curriable<0>(
-        [a1 = std::forward<Arg1>(a1), f = std::move(f)](auto&& ...an) 
-        {return f(a1, std::forward<decltype(an)>(an)...);}
-        );
-    return temp;
-  }
-
-  // placeholder currying
-  template <class Arg1, class ...Args, 
-           typename std::enable_if<std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0>
-  auto operator() (Arg1&&, Args&& ...args) const &
-  {
-    auto temp = make_curriable<1>(F(func)).template new_function<1>(std::forward<Args>(args)...);
-    return temp;
-  }
-  template <class Arg1, class ...Args, 
-           typename std::enable_if<std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0>
-  auto operator() (Arg1&&, Args&& ...args) &&
-  {
-    auto temp = make_curriable<1>(std::move(func)).template new_function<1>(std::forward<Args>(args)...);
-    return temp;
-  }
-
-  // placeholder currying (no placeholder)
-  // NN == 1
-  template <int NN, class Arg1, class ...Args, 
-           typename std::enable_if<!std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0,
-           typename std::enable_if<NN == 1, int>::type = 0>
-  auto new_function (Arg1&& a1, Args&& ...args) const &
-  {
-    const F &f = func; // make local for copying into lambda
-    auto temp = make_curriable<0>(
-        [a1 = std::forward<Arg1>(a1), f](auto&& p1, auto&& ...an) 
-        {return f(std::forward<decltype(p1)>(p1), 
-          a1, std::forward<decltype(an)>(an)...);}
-        ).template new_function<NN>(std::forward<Args>(args)...);
-    return temp;
-  }
-  template <int NN, class Arg1, class ...Args, 
-           typename std::enable_if<!std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0,
-           typename std::enable_if<NN == 1, int>::type = 0>
-  auto new_function (Arg1&& a1, Args&& ...args) &&
-  {
-    const F &f = func; // make local for copying into lambda
-    auto temp = make_curriable<0>(
-        [a1 = std::forward<Arg1>(a1), f = std::move(f)](auto&& p1, auto&& ...an) 
-        {return f(std::forward<decltype(p1)>(p1), 
-          a1, std::forward<decltype(an)>(an)...);}
-        ).template new_function<NN>(std::forward<Args>(args)...);
-    return temp;
-  }
-  // NN == 2
-  template <int NN, class Arg1, class ...Args, 
-           typename std::enable_if<!std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0,
-           typename std::enable_if<NN == 2, int>::type = 0>
-  auto new_function (Arg1&& a1, Args&& ...args) const &
-  {
-    const F &f = func; // make local for copying into lambda
-    auto temp = make_curriable<0>(
-        [a1 = std::forward<Arg1>(a1), f](auto&& p1, auto&& p2, auto&& ...an) 
-        {return f(std::forward<decltype(p1)>(p1), 
-          std::forward<decltype(p2)>(p2), 
-          a1, std::forward<decltype(an)>(an)...);}
-        ).template new_function<NN>(std::forward<Args>(args)...);
-    return temp;
-  }
-  template <int NN, class Arg1, class ...Args, 
-           typename std::enable_if<!std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0,
-           typename std::enable_if<NN == 2, int>::type = 0>
-  auto new_function (Arg1&& a1, Args&& ...args) &&
-  {
-    const F &f = func; // make local for copying into lambda
-    auto temp = make_curriable<0>(
-        [a1 = std::forward<Arg1>(a1), f = std::move(f)](auto&& p1, auto&& p2, auto&& ...an) 
-        {return f(std::forward<decltype(p1)>(p1), 
-          std::forward<decltype(p2)>(p2), 
-          a1, std::forward<decltype(an)>(an)...);}
-        ).template new_function<NN>(std::forward<Args>(args)...);
-    return temp;
-  }
-  // NN == 3
-  template <int NN, class Arg1, class ...Args, 
-           typename std::enable_if<!std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0,
-           typename std::enable_if<NN == 3, int>::type = 0>
-  auto new_function (Arg1&& a1, Args&& ...args) const &
-  {
-    const F &f = func; // make local for copying into lambda
-    auto temp = make_curriable<0>(
-        [a1 = std::forward<Arg1>(a1), f](auto&& p1, auto&& p2, auto&& p3, auto&& ...an) 
-        {return f(std::forward<decltype(p1)>(p1), 
-          std::forward<decltype(p2)>(p2), 
-          std::forward<decltype(p3)>(p3), 
-          a1, std::forward<decltype(an)>(an)...);}
-        ).template new_function<NN>(std::forward<Args>(args)...);
-    return temp;
-  }
-  template <int NN, class Arg1, class ...Args, 
-           typename std::enable_if<!std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0,
-           typename std::enable_if<NN == 3, int>::type = 0>
-  auto new_function (Arg1&& a1, Args&& ...args) &&
-  {
-    const F &f = func; // make local for copying into lambda
-    auto temp = make_curriable<0>(
-        [a1 = std::forward<Arg1>(a1), f = std::move(f)](auto&& p1, auto&& p2, auto&& p3, auto&& ...an) 
-        {return f(std::forward<decltype(p1)>(p1), 
-          std::forward<decltype(p2)>(p2), 
-          std::forward<decltype(p3)>(p3), 
-          a1, std::forward<decltype(an)>(an)...);}
-        ).template new_function<NN>(std::forward<Args>(args)...);
-    return temp;
-  }
-  // NN == 4
-  template <int NN, class Arg1, class ...Args, 
-           typename std::enable_if<!std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0,
-           typename std::enable_if<NN == 4, int>::type = 0>
-  auto new_function (Arg1&& a1, Args&& ...args) const &
-  {
-    const F &f = func; // make local for copying into lambda
-    auto temp = make_curriable<0>(
-        [a1 = std::forward<Arg1>(a1), f](auto&& p1, auto&& p2, auto&& p3, auto&& p4, auto&& ...an) 
-        {return f(std::forward<decltype(p1)>(p1), 
-          std::forward<decltype(p2)>(p2), 
-          std::forward<decltype(p3)>(p3), 
-          std::forward<decltype(p4)>(p4), 
-          a1, std::forward<decltype(an)>(an)...);}
-        ).template new_function<NN>(std::forward<Args>(args)...);
-    return temp;
-  }
-  template <int NN, class Arg1, class ...Args, 
-           typename std::enable_if<!std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0,
-           typename std::enable_if<NN == 4, int>::type = 0>
-  auto new_function (Arg1&& a1, Args&& ...args) &&
-  {
-    const F &f = func; // make local for copying into lambda
-    auto temp = make_curriable<0>(
-        [a1 = std::forward<Arg1>(a1), f = std::move(f)](auto&& p1, auto&& p2, auto&& p3, auto&& p4, auto&& ...an) 
-        {return f(std::forward<decltype(p1)>(p1), 
-          std::forward<decltype(p2)>(p2), 
-          std::forward<decltype(p3)>(p3), 
-          std::forward<decltype(p4)>(p4), 
-          a1, std::forward<decltype(an)>(an)...);}
-        ).template new_function<NN>(std::forward<Args>(args)...);
-    return temp;
-  }
-  // NN == 5
-  template <int NN, class Arg1, class ...Args, 
-           typename std::enable_if<!std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0,
-           typename std::enable_if<NN == 5, int>::type = 0>
-  auto new_function (Arg1&& a1, Args&& ...args) const &
-  {
-    const F &f = func; // make local for copying into lambda
-    auto temp = make_curriable<0>(
-        [a1 = std::forward<Arg1>(a1), f](auto&& p1, auto&& p2, auto&& p3, auto&& p4, auto&& p5, auto&& ...an) 
-        {return f(std::forward<decltype(p1)>(p1), 
-          std::forward<decltype(p2)>(p2), 
-          std::forward<decltype(p3)>(p3), 
-          std::forward<decltype(p4)>(p4), 
-          std::forward<decltype(p5)>(p5), 
-          a1, std::forward<decltype(an)>(an)...);}
-        ).template new_function<NN>(std::forward<Args>(args)...);
-    return temp;
-  }
-  template <int NN, class Arg1, class ...Args, 
-           typename std::enable_if<!std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0,
-           typename std::enable_if<NN == 5, int>::type = 0>
-  auto new_function (Arg1&& a1, Args&& ...args) &&
-  {
-    const F &f = func; // make local for copying into lambda
-    auto temp = make_curriable<0>(
-        [a1 = std::forward<Arg1>(a1), f = std::move(f)](auto&& p1, auto&& p2, auto&& p3, auto&& p4, auto&& p5, auto&& ...an) 
-        {return f(std::forward<decltype(p1)>(p1), 
-          std::forward<decltype(p2)>(p2), 
-          std::forward<decltype(p3)>(p3), 
-          std::forward<decltype(p4)>(p4), 
-          std::forward<decltype(p5)>(p5), 
-          a1, std::forward<decltype(an)>(an)...);}
-        ).template new_function<NN>(std::forward<Args>(args)...);
-    return temp;
-  }
-  // NN == 6
-  template <int NN, class Arg1, class ...Args, 
-           typename std::enable_if<!std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0,
-           typename std::enable_if<NN == 6, int>::type = 0>
-  auto new_function (Arg1&& a1, Args&& ...args) const &
-  {
-    const F &f = func; // make local for copying into lambda
-    auto temp = make_curriable<0>(
-        [a1 = std::forward<Arg1>(a1), f](auto&& p1, auto&& p2, auto&& p3, auto&& p4, auto&& p5, auto&& p6, auto&& ...an) 
-        {return f(std::forward<decltype(p1)>(p1), 
-          std::forward<decltype(p2)>(p2), 
-          std::forward<decltype(p3)>(p3), 
-          std::forward<decltype(p4)>(p4), 
-          std::forward<decltype(p5)>(p5), 
-          std::forward<decltype(p6)>(p6), 
-          a1, std::forward<decltype(an)>(an)...);}
-        ).template new_function<NN>(std::forward<Args>(args)...);
-    return temp;
-  }
-  template <int NN, class Arg1, class ...Args, 
-           typename std::enable_if<!std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0,
-           typename std::enable_if<NN == 6, int>::type = 0>
-  auto new_function (Arg1&& a1, Args&& ...args) &&
-  {
-    const F &f = func; // make local for copying into lambda
-    auto temp = make_curriable<0>(
-        [a1 = std::forward<Arg1>(a1), f = std::move(f)](auto&& p1, auto&& p2, auto&& p3, auto&& p4, auto&& p5, auto&& p6, auto&& ...an) 
-        {return f(std::forward<decltype(p1)>(p1), 
-          std::forward<decltype(p2)>(p2), 
-          std::forward<decltype(p3)>(p3), 
-          std::forward<decltype(p4)>(p4), 
-          std::forward<decltype(p5)>(p5), 
-          std::forward<decltype(p6)>(p6), 
-          a1, std::forward<decltype(an)>(an)...);}
-        ).template new_function<NN>(std::forward<Args>(args)...);
-    return temp;
-  }
-  // NN == 7
-  template <int NN, class Arg1, class ...Args, 
-           typename std::enable_if<!std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0,
-           typename std::enable_if<NN == 7, int>::type = 0>
-  auto new_function (Arg1&& a1, Args&& ...args) const &
-  {
-    const F &f = func; // make local for copying into lambda
-    auto temp = make_curriable<0>(
-        [a1 = std::forward<Arg1>(a1), f](auto&& p1, auto&& p2, auto&& p3, auto&& p4, auto&& p5, auto&& p6, auto&& p7, auto&& ...an) 
-        {return f(std::forward<decltype(p1)>(p1), 
-          std::forward<decltype(p2)>(p2), 
-          std::forward<decltype(p3)>(p3), 
-          std::forward<decltype(p4)>(p4), 
-          std::forward<decltype(p5)>(p5), 
-          std::forward<decltype(p6)>(p6), 
-          std::forward<decltype(p7)>(p7), 
-          a1, std::forward<decltype(an)>(an)...);}
-        ).template new_function<NN>(std::forward<Args>(args)...);
-    return temp;
-  }
-  template <int NN, class Arg1, class ...Args, 
-           typename std::enable_if<!std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0,
-           typename std::enable_if<NN == 7, int>::type = 0>
-  auto new_function (Arg1&& a1, Args&& ...args) &&
-  {
-    const F &f = func; // make local for copying into lambda
-    auto temp = make_curriable<0>(
-        [a1 = std::forward<Arg1>(a1), f = std::move(f)](auto&& p1, auto&& p2, auto&& p3, auto&& p4, auto&& p5, auto&& p6, auto&& p7, auto&& ...an) 
-        {return f(std::forward<decltype(p1)>(p1), 
-          std::forward<decltype(p2)>(p2), 
-          std::forward<decltype(p3)>(p3), 
-          std::forward<decltype(p4)>(p4), 
-          std::forward<decltype(p5)>(p5), 
-          std::forward<decltype(p6)>(p6), 
-          std::forward<decltype(p7)>(p7), 
-          a1, std::forward<decltype(an)>(an)...);}
-        ).template new_function<NN>(std::forward<Args>(args)...);
-    return temp;
-  }
-  // NN == 8
-  template <int NN, class Arg1, class ...Args, 
-           typename std::enable_if<!std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0,
-           typename std::enable_if<NN == 8, int>::type = 0>
-  auto new_function (Arg1&& a1, Args&& ...args) const &
-  {
-    const F &f = func; // make local for copying into lambda
-    auto temp = make_curriable<0>(
-        [a1 = std::forward<Arg1>(a1), f](auto&& p1, auto&& p2, auto&& p3, auto&& p4, auto&& p5, auto&& p6, auto&& p7, auto&& p8, auto&& ...an) 
-        {return f(std::forward<decltype(p1)>(p1), 
-          std::forward<decltype(p2)>(p2), 
-          std::forward<decltype(p3)>(p3), 
-          std::forward<decltype(p4)>(p4), 
-          std::forward<decltype(p5)>(p5), 
-          std::forward<decltype(p6)>(p6), 
-          std::forward<decltype(p7)>(p7), 
-          std::forward<decltype(p8)>(p8), 
-          a1, std::forward<decltype(an)>(an)...);}
-        ).template new_function<NN>(std::forward<Args>(args)...);
-    return temp;
-  }
-  template <int NN, class Arg1, class ...Args, 
-           typename std::enable_if<!std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0,
-           typename std::enable_if<NN == 8, int>::type = 0>
-  auto new_function (Arg1&& a1, Args&& ...args) &&
-  {
-    const F &f = func; // make local for copying into lambda
-    auto temp = make_curriable<0>(
-        [a1 = std::forward<Arg1>(a1), f = std::move(f)](auto&& p1, auto&& p2, auto&& p3, auto&& p4, auto&& p5, auto&& p6, auto&& p7, auto&& p8, auto&& ...an) 
-        {return f(std::forward<decltype(p1)>(p1), 
-          std::forward<decltype(p2)>(p2), 
-          std::forward<decltype(p3)>(p3), 
-          std::forward<decltype(p4)>(p4), 
-          std::forward<decltype(p5)>(p5), 
-          std::forward<decltype(p6)>(p6), 
-          std::forward<decltype(p7)>(p7), 
-          std::forward<decltype(p8)>(p8), 
-          a1, std::forward<decltype(an)>(an)...);}
-        ).template new_function<NN>(std::forward<Args>(args)...);
-    return temp;
-  }
-
-  // placeholder currying (with placeholder)
-  template <int NN, class Arg1, class ...Args, typename std::enable_if<std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0>
-  auto new_function (Arg1&&, Args&& ...args) const &
-  {
-    auto temp = make_curriable<1>(F(func)).template new_function<NN + 1>(std::forward<Args>(args)...);
-    return temp;
-  }
-  template <int NN, class Arg1, class ...Args, typename std::enable_if<std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0>
-  auto new_function (Arg1&&, Args&& ...args) &&
-  {
-    auto temp = make_curriable<1>(std::move(func)).template new_function<NN + 1>(std::forward<Args>(args)...);
-    return temp;
-  }
-
-  template <int>
-  auto new_function () const &
-  {
-    auto temp = make_curriable<1>(F(func));
-    return temp;
-  }
-  template <int>
-  auto new_function () &&
-  {
-    auto temp = make_curriable<1>(std::move(func));
-    return temp;
-  }
-
-  auto operator() () const &
-  {
-    auto temp = make_curriable<1>(F(func));
-    return temp;
-  }
-  auto operator() () &&
-  {
-    auto temp = make_curriable<1>(std::move(func));
-    return temp;
-  }
-};
+// // chance to capture suspension (can call with variable number of args)
+// template <class F>
+// struct curried_type<F, 1> {
+//   using func_type = F;
+//   F func;
+// 
+//   curried_type() = delete;
+//   curried_type (F &&f) : func(std::move(f)) {}
+//   curried_type (const F &f) : func(f) {}
+// 
+//   // automatic conversion to std::function
+//   template <class T, class Arg>
+//   operator std::function<T(Arg)>() const &
+//   {
+//     std::function<T(Arg)> temp{F(func)};
+//     return temp; 
+//   }
+//   template <class T, class Arg>
+//   operator std::function<T(Arg)>() &&
+//   {
+//     std::function<T(Arg)> temp{std::move(func)};
+//     return temp; 
+//   }
+// 
+//   
+//   // normal currying
+//   template <class Arg1, class ...Args, 
+//            typename std::enable_if<!std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0>
+//   auto operator() (Arg1&& a1, Args&& ...args) const &
+//   {
+//     const F &f = func; // make local for copying into lambda
+//     auto temp = make_curriable<0>(
+//         [a1 = std::forward<Arg1>(a1), f](auto&& ...an) 
+//         {return f(a1, std::forward<decltype(an)>(an)...);}
+//         );
+//     return temp;
+//   }
+//   template <class Arg1, class ...Args, 
+//            typename std::enable_if<!std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0>
+//   auto operator() (Arg1&& a1, Args&& ...args) &&
+//   {
+//     const F &f = func; // make local for copying into lambda
+//     auto temp = make_curriable<0>(
+//         [a1 = std::forward<Arg1>(a1), f = std::move(f)](auto&& ...an) 
+//         {return f(a1, std::forward<decltype(an)>(an)...);}
+//         );
+//     return temp;
+//   }
+// 
+//   // placeholder currying
+//   template <class Arg1, class ...Args, 
+//            typename std::enable_if<std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0>
+//   auto operator() (Arg1&&, Args&& ...args) const &
+//   {
+//     auto temp = make_curriable<1>(F(func)).template new_function<1>(std::forward<Args>(args)...);
+//     return temp;
+//   }
+//   template <class Arg1, class ...Args, 
+//            typename std::enable_if<std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0>
+//   auto operator() (Arg1&&, Args&& ...args) &&
+//   {
+//     auto temp = make_curriable<1>(std::move(func)).template new_function<1>(std::forward<Args>(args)...);
+//     return temp;
+//   }
+// 
+//   // placeholder currying (no placeholder)
+//   // NN == 1
+//   template <int NN, class Arg1, class ...Args, 
+//            typename std::enable_if<!std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0,
+//            typename std::enable_if<NN == 1, int>::type = 0>
+//   auto new_function (Arg1&& a1, Args&& ...args) const &
+//   {
+//     const F &f = func; // make local for copying into lambda
+//     auto temp = make_curriable<0>(
+//         [a1 = std::forward<Arg1>(a1), f](auto&& p1, auto&& ...an) 
+//         {return f(std::forward<decltype(p1)>(p1), 
+//           a1, std::forward<decltype(an)>(an)...);}
+//         ).template new_function<NN>(std::forward<Args>(args)...);
+//     return temp;
+//   }
+//   template <int NN, class Arg1, class ...Args, 
+//            typename std::enable_if<!std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0,
+//            typename std::enable_if<NN == 1, int>::type = 0>
+//   auto new_function (Arg1&& a1, Args&& ...args) &&
+//   {
+//     const F &f = func; // make local for copying into lambda
+//     auto temp = make_curriable<0>(
+//         [a1 = std::forward<Arg1>(a1), f = std::move(f)](auto&& p1, auto&& ...an) 
+//         {return f(std::forward<decltype(p1)>(p1), 
+//           a1, std::forward<decltype(an)>(an)...);}
+//         ).template new_function<NN>(std::forward<Args>(args)...);
+//     return temp;
+//   }
+// 
+//   // placeholder currying (with placeholder)
+//   template <int NN, class Arg1, class ...Args, typename std::enable_if<std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0>
+//   auto new_function (Arg1&&, Args&& ...args) const &
+//   {
+//     auto temp = make_curriable<1>(F(func)).template new_function<NN + 1>(std::forward<Args>(args)...);
+//     return temp;
+//   }
+//   template <int NN, class Arg1, class ...Args, typename std::enable_if<std::is_same<typename std::decay<Arg1>::type, placeholder>::value, int>::type = 0>
+//   auto new_function (Arg1&&, Args&& ...args) &&
+//   {
+//     auto temp = make_curriable<1>(std::move(func)).template new_function<NN + 1>(std::forward<Args>(args)...);
+//     return temp;
+//   }
+// 
+//   template <int>
+//   auto new_function () const &
+//   {
+//     auto temp = make_curriable<1>(F(func));
+//     return temp;
+//   }
+//   template <int>
+//   auto new_function () &&
+//   {
+//     auto temp = make_curriable<1>(std::move(func));
+//     return temp;
+//   }
+// 
+//   auto operator() () const &
+//   {
+//     auto temp = make_curriable<1>(F(func));
+//     return temp;
+//   }
+//   auto operator() () &&
+//   {
+//     auto temp = make_curriable<1>(std::move(func));
+//     return temp;
+//   }
+// };
 
 
 
@@ -873,7 +654,7 @@ struct curried_type<F, 0> {
     return thunk(this);
   }
   template <class ...Args>
-  result_type operator() (Args&& ...) &&
+  auto operator() (Args&& ...) &&
   {
     // no need to memoize value if temporary
     return func();
@@ -981,13 +762,13 @@ auto operator* (curried_type<F1, 1>&& c1, curried_type<F2, N2>&& c2)
 // infix operator
 // //////////////
 template <class T, class F, int N>
-auto operator^ (T&& val, curried_type<F, N>&& c)
+auto operator% (T&& val, curried_type<F, N>&& c)
 {
   auto temp = c(std::forward<decltype(val)>(val));
   return temp;
 }
 template <class T, class F, int N>
-auto operator^ (T&& val, const curried_type<F, N> &c)
+auto operator% (T&& val, const curried_type<F, N> &c)
 {
   auto temp = c(std::forward<decltype(val)>(val));
   return temp;
@@ -999,13 +780,13 @@ auto operator^ (T&& val, const curried_type<F, N> &c)
 // infix and function call operator
 // ////////////////////////////////
 template <class T, class F, int N>
-auto operator^ (curried_type<F, N>&& c, T&& val)
+auto operator% (curried_type<F, N>&& c, T&& val)
 {
   auto temp = c(std::forward<decltype(val)>(val));
   return temp;
 }
 template <class T, class F, int N>
-auto operator^ (const curried_type<F, N> &c, T&& val)
+auto operator% (const curried_type<F, N> &c, T&& val)
 {
   auto temp = c(std::forward<decltype(val)>(val));
   return temp;
@@ -1013,15 +794,16 @@ auto operator^ (const curried_type<F, N> &c, T&& val)
 
 
 
-// ///////////////////////////////////////////////////////
-// allows for eager usage without casting to std::function
-// ///////////////////////////////////////////////////////
+// ////////////////////////////////////////////////////////////////////////////////
+// allows for eager usage without casting to std::function and bypassing suspension
+// ////////////////////////////////////////////////////////////////////////////////
 template <int N, class F>
 auto make_eager (curried_type<F,N> &&c)
 {
   return [c = std::move(c)](auto&& ...args) {
     static_assert(sizeof...(args) == N, "supplied the incorrect number of arguments to eager function"); 
-    return c(std::forward<decltype(args)>(args)...)();};
+    // return c(std::forward<decltype(args)>(args)...)();};
+    return c.func(std::forward<decltype(args)>(args)...);};
 }
 
 template <int N, class F>
@@ -1029,7 +811,29 @@ auto make_eager (const curried_type<F,N> &c)
 {
   return [&c](auto&& ...args) {
     static_assert(sizeof...(args) == N, "supplied the incorrect number of arguments to eager function");
-    return c(std::forward<decltype(args)>(args)...)();};
+    // return c(std::forward<decltype(args)>(args)...)();};
+    return c.func(std::forward<decltype(args)>(args)...);};
+}
+
+
+ 
+// ///////////////////////////////////////////////////////////
+// streams the output for a thunk and function arity otherwise
+// ///////////////////////////////////////////////////////////
+template <int N, class F,
+          typename std::enable_if<N == 0, int>::type = 0>
+std::ostream& operator<< (std::ostream& os, const curried_type<F,N> &c) 
+{
+  os << c();
+  return os;
+}
+
+template <int N, class F,
+          typename std::enable_if<N != 0, int>::type = 0>
+std::ostream& operator<< (std::ostream& os, const curried_type<F,N> &c) 
+{
+  os << "curried function with " << N << " arguments";
+  return os;
 }
 
 

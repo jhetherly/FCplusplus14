@@ -34,8 +34,9 @@ int main ()
   std::uniform_int_distribution<> dis(-10, 10);
   auto random_num = [&gen, &dis]() {return dis(gen);};
   // setup clock for timing
-  auto start = steady_clock::now();
-  auto end = steady_clock::now();
+  auto clock = steady_clock::now;
+  auto start = clock();
+  auto end = clock();
   auto ave_diff = duration <double, std::nano> (end - start).count();
   // max testing loop
   auto max_loop = 1000;
@@ -66,29 +67,29 @@ int main ()
       loop_sum += num1 + num2;
 
   // no function call
-  start = steady_clock::now();
+  start = clock();
   for (auto num1 : random_nums1)
     for (auto num2 : random_nums2)
       loop_sum += num1 + num2;
-  end = steady_clock::now();
+  end = clock();
   ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size()*random_nums2.size());
   std::cout << "Average time for " << random_nums1.size()*random_nums2.size() << " addition of two numbers: " << ave_diff << " ns" << std::endl;
 
   // normal function call
-  start = steady_clock::now();
+  start = clock();
   for (auto num1 : random_nums1)
     for (auto num2 : random_nums2)
       loop_sum += addtogether(num1, num2);
-  end = steady_clock::now();
+  end = clock();
   ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size()*random_nums2.size());
   std::cout << "Average time for " << random_nums1.size()*random_nums2.size() << " calls to (normal function) addtogether: " << ave_diff << " ns" << std::endl;
 
   // curriable-wrapped function call
-  start = steady_clock::now();
+  start = clock();
   for (auto num1 : random_nums1)
     for (auto num2 : random_nums2)
       loop_sum += addtoo(num1, num2)();
-  end = steady_clock::now();
+  end = clock();
   ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size()*random_nums2.size());
   std::cout << "Average time for " << random_nums1.size()*random_nums2.size() << " calls to (curried function) addtoo: " << ave_diff << " ns" << std::endl;
 
@@ -106,29 +107,29 @@ int main ()
       loop_sum += num1 + num2;
 
   // no function call
-  start = steady_clock::now();
+  start = clock();
   for (auto num1 : random_nums1)
     for (auto num2 : random_nums2)
       loop_sum += num1 + num2;
-  end = steady_clock::now();
+  end = clock();
   ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size()*random_nums2.size());
   std::cout << "Average time for " << random_nums1.size()*random_nums2.size() << " addition of two numbers: " << ave_diff << " ns" << std::endl;
 
   // normal function object call
-  start = steady_clock::now();
+  start = clock();
   for (auto num1 : random_nums1)
     for (auto num2 : random_nums2)
       loop_sum += func_object(num1, num2);
-  end = steady_clock::now();
+  end = clock();
   ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size()*random_nums2.size());
   std::cout << "Average time for " << random_nums1.size()*random_nums2.size() << " calls to (normal function object) func_object: " << ave_diff << " ns" << std::endl;
 
   // curriable-wrapped function call
-  start = steady_clock::now();
+  start = clock();
   for (auto num1 : random_nums1)
     for (auto num2 : random_nums2)
       loop_sum += addobject(num1, num2)();
-  end = steady_clock::now();
+  end = clock();
   ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size()*random_nums2.size());
   std::cout << "Average time for " << random_nums1.size()*random_nums2.size() << " calls to (curried function) addobject: " << ave_diff << " ns" << std::endl;
 
@@ -147,29 +148,29 @@ int main ()
       loop_sum += num1 + num2 + num2;
 
   // no function call
-  start = steady_clock::now();
+  start = clock();
   for (auto num1 : random_nums1)
     for (auto num2 : random_nums2)
       loop_sum += num1 + num2 + num2;
-  end = steady_clock::now();
+  end = clock();
   ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size()*random_nums2.size());
   std::cout << "Average time for " << random_nums1.size()*random_nums2.size() << " addition of two numbers: " << ave_diff << " ns" << std::endl;
 
   // lambda call
-  start = steady_clock::now();
+  start = clock();
   for (auto num1 : random_nums1)
     for (auto num2 : random_nums2)
       loop_sum += _adder(num1, num2);
-  end = steady_clock::now();
+  end = clock();
   ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size()*random_nums2.size());
   std::cout << "Average time for " << random_nums1.size()*random_nums2.size() << " calls to (generic lambda) _adder: " << ave_diff << " ns" << std::endl;
 
   // curriable-wrapped function call
-  start = steady_clock::now();
+  start = clock();
   for (auto num1 : random_nums1)
     for (auto num2 : random_nums2)
       loop_sum += adder(num1, num2)();
-  end = steady_clock::now();
+  end = clock();
   ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size()*random_nums2.size());
   std::cout << "Average time for " << random_nums1.size()*random_nums2.size() << " calls to (2 arg curried function) adder: " << ave_diff << " ns" << std::endl;
 
@@ -183,10 +184,10 @@ int main ()
   for (auto num1 : random_nums1)
     loop_sum += addtwo(num1)();
 
-  start = steady_clock::now();
+  start = clock();
   for (auto num1 : random_nums1)
     loop_sum += addtwo(num1)();
-  end = steady_clock::now();
+  end = clock();
   ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size());
   std::cout << "Average time for " << random_nums1.size() << " calls to (1 arg curried function) addtwo: " << ave_diff << " ns" << std::endl;
 
@@ -205,32 +206,32 @@ int main ()
         loop_sum += num1 + num2 + num2 + num3 + num3 + num3;
 
   // no function call
-  start = steady_clock::now();
+  start = clock();
   for (auto num1 : random_nums1)
     for (auto num2 : random_nums2)
       for (auto num3 : random_nums3)
         loop_sum += num1 + num2 + num2 + num3 + num3 + num3;
-  end = steady_clock::now();
+  end = clock();
   ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size()*random_nums2.size()*random_nums3.size());
   std::cout << "Average time for " << random_nums1.size()*random_nums2.size()*random_nums3.size() << " addition of three numbers: " << ave_diff << " ns" << std::endl;
 
   // lambda call
-  start = steady_clock::now();
+  start = clock();
   for (auto num1 : random_nums1)
     for (auto num2 : random_nums2)
       for (auto num3 : random_nums3)
         loop_sum += _addtrio(num1, num2, num3);
-  end = steady_clock::now();
+  end = clock();
   ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size()*random_nums2.size()*random_nums3.size());
   std::cout << "Average time for " << random_nums1.size()*random_nums2.size()*random_nums3.size() << " calls to (lambda function) _addtrio: " << ave_diff << " ns" << std::endl;
 
   // curriable-wrapped function call
-  start = steady_clock::now();
+  start = clock();
   for (auto num1 : random_nums1)
     for (auto num2 : random_nums2)
       for (auto num3 : random_nums3)
         loop_sum += addtrio(num1, num2, num3)();
-  end = steady_clock::now();
+  end = clock();
   ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size()*random_nums2.size()*random_nums3.size());
   std::cout << "Average time for " << random_nums1.size()*random_nums2.size()*random_nums3.size() << " calls to (3 arg curried function) addtrio: " << ave_diff << " ns" << std::endl;
 
@@ -246,20 +247,20 @@ int main ()
       loop_sum += num1 + num2;
 
   // lambda call
-  start = steady_clock::now();
+  start = clock();
   for (auto num1 : random_nums1)
     for (auto num2 : random_nums2)
       loop_sum += _add2p(num1, num2);
-  end = steady_clock::now();
+  end = clock();
   ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size()*random_nums2.size());
   std::cout << "Average time for " << random_nums1.size()*random_nums2.size() << " calls to (lambda function) _add2p: " << ave_diff << " ns" << std::endl;
 
   // curriable-wrapped function call
-  start = steady_clock::now();
+  start = clock();
   for (auto num1 : random_nums1)
     for (auto num2 : random_nums2)
       loop_sum += add2p(num1, num2)();
-  end = steady_clock::now();
+  end = clock();
   ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size()*random_nums2.size());
   std::cout << "Average time for " << random_nums1.size()*random_nums2.size() << " calls to (3 arg curried function, 2 placeholders) add2p: " << ave_diff << " ns" << std::endl;
 
@@ -277,20 +278,20 @@ int main ()
       loop_sum += comp(num1, num2)();
 
   // lambda call
-  start = steady_clock::now();
+  start = clock();
   for (auto num1 : random_nums1)
     for (auto num2 : random_nums2)
       loop_sum += manual_comp(num1, num2);
-  end = steady_clock::now();
+  end = clock();
   ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size()*random_nums2.size());
   std::cout << "Average time for " << random_nums1.size()*random_nums2.size() << " calls to (generic lambda) manual_comp: " << ave_diff << " ns" << std::endl;
 
   // composed, curriable-wrapped function call
-  start = steady_clock::now();
+  start = clock();
   for (auto num1 : random_nums1)
     for (auto num2 : random_nums2)
       loop_sum += comp(num1, num2)();
-  end = steady_clock::now();
+  end = clock();
   ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size()*random_nums2.size());
   std::cout << "Average time for " << random_nums1.size()*random_nums2.size() << " calls to (2 arg curried function) comp: " << ave_diff << " ns" << std::endl;
 
@@ -298,6 +299,7 @@ int main ()
 
   // runtime performance
   std::cout << std::endl << "Storing in a std::function" << std::endl;
+  auto re_eager = make_eager(addtwo);
   std::function<int(int)> re = addtwo;
   auto rere = make_curriable(re);
   auto rerere = make_curriable<decltype(addtwo.func)>(re); // i.e. rerere == addtwo
@@ -311,35 +313,43 @@ int main ()
   for (auto num1 : random_nums1)
     loop_sum += re(num1);
 
-  // re-eagered function
-  start = steady_clock::now();
+  // adding two numbers
+  start = clock();
   for (auto num1 : random_nums1)
     loop_sum += 2 + num1 + num1;
-  end = steady_clock::now();
+  end = clock();
   ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size());
   std::cout << "Average time for " << random_nums1.size() << " addition of two numbers: " << ave_diff << " ns" << std::endl;
 
+  // re-eagered function
+  start = clock();
+  for (auto num1 : random_nums1)
+    loop_sum += re_eager(num1);
+  end = clock();
+  ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size());
+  std::cout << "Average time for " << random_nums1.size() << " calls to (re-eagered function) re_eager: " << ave_diff << " ns" << std::endl;
+
   // std::function function
-  start = steady_clock::now();
+  start = clock();
   for (auto num1 : random_nums1)
     loop_sum += re(num1);
-  end = steady_clock::now();
+  end = clock();
   ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size());
   std::cout << "Average time for " << random_nums1.size() << " calls to (1 arg std::function) re: " << ave_diff << " ns" << std::endl;
 
   // re-curried function
-  start = steady_clock::now();
+  start = clock();
   for (auto num1 : random_nums1)
     loop_sum += rere(num1)();
-  end = steady_clock::now();
+  end = clock();
   ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size());
   std::cout << "Average time for " << random_nums1.size() << " calls to (1 arg re-curried function) rere: " << ave_diff << " ns" << std::endl;
 
   // re-curried function
-  start = steady_clock::now();
+  start = clock();
   for (auto num1 : random_nums1)
     loop_sum += rerere(num1)();
-  end = steady_clock::now();
+  end = clock();
   ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size());
   std::cout << "Average time for " << random_nums1.size() << " calls to (1 arg re-curried \"type specified\" function) rerere: " << ave_diff << " ns" << std::endl;
 
@@ -357,10 +367,10 @@ int main ()
   for (auto num1 : random_nums1)
     loop_sum += num1;
 
-  start = steady_clock::now();
+  start = clock();
   for (auto num1 : random_nums1)
     loop_sum += num1;
-  end = steady_clock::now();
+  end = clock();
   ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size());
   std::cout << "Average time for " << random_nums1.size() << " additions of random numbers: " << ave_diff << " ns" << std::endl;
 
@@ -368,17 +378,17 @@ int main ()
   for (const auto &thunk : random_thunks) // ignore this warning
     loop_sum += 1;
 
-  start = steady_clock::now();
+  start = clock();
   for (const auto &thunk : random_thunks)
     loop_sum += thunk();
-  end = steady_clock::now();
+  end = clock();
   ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size());
   std::cout << "Average time for " << random_nums1.size() << " calls to force a thunk: " << ave_diff << " ns" << std::endl;
 
-  start = steady_clock::now();
+  start = clock();
   for (const auto &thunk : random_thunks)
     loop_sum += thunk();
-  end = steady_clock::now();
+  end = clock();
   ave_diff = duration <double, std::nano> (end - start).count() / static_cast<decltype(ave_diff)>(random_nums1.size());
   std::cout << "Average time for " << random_nums1.size() << " calls to retrieve a thunk: " << ave_diff << " ns" << std::endl;
 
@@ -386,8 +396,8 @@ int main ()
 
 
   std::cout << "\n\nDummy sum value: " << loop_sum << std::endl;
-  std::cout << "\n\ninfix test: " << (2 ^adder^ 3)() << std::endl;
-  std::cout << "call test: " << (adder^ 2 ^ 3)() << std::endl;
+  std::cout << "\n\ninfix test: " << 2 %adder% 3 << std::endl;
+  std::cout << "call test: " << adder% 2% 3 << std::endl;
 
   // std::function is subtype polymorphic (but eager)!!!
   //  I think for the sake of maximal STL compatibility std::function should take the role of indirect functoids
